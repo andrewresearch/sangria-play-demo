@@ -16,18 +16,15 @@
 
 package handlers
 
-import models.MessageSpecification
-import models.MessageSpecification.MessageRepo
-
+import models.QuerySchema
 import play.api.libs.json.JsObject
 import play.api.mvc.Result
 import play.api.mvc.Results.{BadRequest, InternalServerError, Ok}
-
 import sangria.ast.Document
 import sangria.execution.{ErrorWithResolver, Executor, QueryAnalysisError}
+import sangria.marshalling.playJson.{PlayJsonInputUnmarshallerJObject, PlayJsonResultMarshaller}
 import sangria.parser.{QueryParser, SyntaxError}
 import sangria.schema.Schema
-import sangria.marshalling.playJson.{PlayJsonInputUnmarshallerJObject,PlayJsonResultMarshaller}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
@@ -39,8 +36,8 @@ import scala.util.{Failure, Success}
 
 object GraphQlHandler {
 
-  lazy val schema:Schema[MessageRepo,Unit] = MessageSpecification.schema
-  lazy val repo:MessageRepo = MessageSpecification.repo
+  lazy val schema:Schema[QueryActions,Unit] = QuerySchema.createSchema
+  lazy val actions:QueryActions = new QueryActions
 
   def process(query:String,name:Option[String],variables:JsObject):Future[Result] = QueryParser.parse(query) match {
     case Success(queryAst) => executeGraphQLQuery(queryAst, name, variables)
@@ -49,7 +46,7 @@ object GraphQlHandler {
 
   def executeGraphQLQuery(query: Document, name: Option[String], vars: JsObject):Future[Result] = {
 
-    Executor.execute(schema, query, repo, operationName = name, variables = vars)
+    Executor.execute(schema, query, actions, operationName = name, variables = vars)
       .map(Ok(_))
       .recover {
         case error: QueryAnalysisError => BadRequest(error.resolveError)
